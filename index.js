@@ -1,25 +1,32 @@
 #!/usr/bin/env node
-'use strict';
 
 process.title = 'wikit';
-const path = require('path');
-const fs = require('fs');
 
-const wiki = require('wtf_wikipedia');
-const inquirer = require('inquirer');
-const ora = require('ora');
-const opn = require('opn');
-const htmlToText = require('html-to-text');
+import { dirname, join } from 'path';
+import { readFileSync } from 'fs';
 
-const Configstore = require('configstore');
-const pkg = require(path.join(__dirname, '/package.json'));
-const conf = new Configstore(pkg.name, { lang: 'en' });
+import Configstore from 'configstore';
+import wiki from 'wtf_wikipedia';
+import inquirer from 'inquirer';
+import minimist from 'minimist';
+import ora from 'ora';
+import opn from 'opn';
+import { htmlToText } from 'html-to-text';
+import {fileURLToPath} from 'node:url';
 
-const languages = JSON.parse(fs.readFileSync(
-  path.join(__dirname, 'data/languages.json')
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Fetch package name and setup Configstore
+const packageJsonPath = join(__dirname, 'package.json');
+const pkgData = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
+const conf = new Configstore(pkgData.name, { lang: 'en' });
+
+const languages = JSON.parse(readFileSync(
+  join(__dirname, 'data/languages.json')
 ));
 
-const argv = require('minimist')(process.argv.slice(2));
+const argv = minimist(process.argv.slice(2));
 
 // Print version if requested
 if (argv.version || argv.v) printVersionAndExit();
@@ -143,13 +150,13 @@ function handleAmbiguousResults(doc, queryText) {
   const choices = [];
   doc.sections().forEach(section => {
     section.links().forEach(link => {
-      if (link.page) choices.push(link.page);
+      if (link.page) choices.push(link.data.page);
     });
   });
   inquirer.prompt([
     {
       name: 'selection',
-      type: 'list',
+      type: 'select',
       message: `Ambiguous results, "${queryText}" may refer to:`,
       choices: choices,
       pageSize: 15,
@@ -163,7 +170,7 @@ function handleAmbiguousResults(doc, queryText) {
 
 function lineWrap(text, max) {
   // remove stray html elements
-  text = htmlToText.fromString(text, {
+  text = htmlToText(text, {
     wordwrap: false,
     uppercaseHeadings: false,
     ignoreHref: true,
